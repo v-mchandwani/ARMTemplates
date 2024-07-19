@@ -1,0 +1,66 @@
+{
+	"$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"keyVaultName": {
+			"type": "string",
+			"metadata": {
+				"description": "Key Vault Name"
+			}
+		},
+		"logicAppPrincipalId":{
+			"type": "string",
+			"metadata": {
+				"description": "Logic App Principal Id"
+			}
+		}
+	},
+	"variables": {
+		"resourceLocation": "[resourceGroup().location]"
+	},
+	"resources": [
+		{
+			"type": "Microsoft.Web/connections",
+			"apiVersion": "2016-06-01",
+			"name": "keyvault",
+			"kind": "v2",
+			"location": "[variables('resourceLocation')]",
+			"properties": {
+				"api": {
+					"id": "[concat(subscription().id,'/providers/Microsoft.Web/locations/',variables('resourceLocation'),'/managedApis/keyvault')]"
+				},
+				"displayName": "Application User",
+				"parameterValueSet":{
+            "name":"oauthMI",
+            "values":{
+                "vaultName":{
+                    "value":"[parameters('keyVaultName')]"
+                    }}}
+			}
+		},
+		{
+			"type": "Microsoft.Web/connections/accessPolicies",
+			"apiVersion": "2016-06-01",
+			"name": "[concat('keyvault','/',parameters('logicAppPrincipalId'))]",
+			"location": "[variables('resourceLocation')]",
+			"dependsOn": [
+				"[resourceId('Microsoft.Web/connections', 'keyvault')]"
+			],
+			"properties": {
+				"principal": {
+					"type": "ActiveDirectory",
+					"identity": {
+						"objectId": "[parameters('logicAppPrincipalId')]",
+						"tenantId": "[subscription().tenantId]"
+					}
+				}
+			}
+		}
+	],
+	"outputs": {
+		"kvRunTimeUrl": {
+			"type": "string",
+			"value": "[reference(resourceId('Microsoft.Web/connections', 'keyvault'),'2016-06-01', 'full').properties.connectionRuntimeUrl]"
+		}
+	}
+}
